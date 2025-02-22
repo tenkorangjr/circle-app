@@ -6,10 +6,11 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"github.com/tenkorangjr/circle-app/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/tenkorangjr/circle-app/models"
 )
 
 var DB *gorm.DB
