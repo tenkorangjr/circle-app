@@ -48,3 +48,38 @@ func TestSignUpRoute(t *testing.T) {
 	checkPassword := utils.ValidatePassword(createdUser.Password, "admin")
 	assert.True(t, checkPassword) // Ensure the password is not returned in plain text
 }
+
+func TestSignInRoute(t *testing.T) {
+
+	db.DB = SetupTestDB()
+	server := gin.Default()
+	RegisterRoutes(server)
+
+	// Mock signing up a user
+	user := models.NewUser("michael@tenkorang.com", "admin")
+	userBytes, _ := json.Marshal(user)
+	req, _ := http.NewRequest("POST", "/signup", bytes.NewBuffer(userBytes))
+	req.Header.Set("Content-Type", "application/json")
+	responseWriter := httptest.NewRecorder()
+	server.ServeHTTP(responseWriter, req)
+
+	assert.Equal(t, http.StatusCreated, responseWriter.Code)
+
+	// Testing signing in user
+	signInData := map[string]string{
+		"email":    "michael@tenkorang.com",
+		"password": "admin",
+	}
+	signInBytes, _ := json.Marshal(signInData)
+	signInReq, _ := http.NewRequest("POST", "/signin", bytes.NewBuffer(signInBytes))
+	signInReq.Header.Set("Content-Type", "application/json")
+	signInResponseWriter := httptest.NewRecorder()
+	server.ServeHTTP(signInResponseWriter, signInReq)
+
+	assert.Equal(t, http.StatusOK, signInResponseWriter.Code)
+
+	var signInResponse map[string]interface{}
+	json.Unmarshal(signInResponseWriter.Body.Bytes(), &signInResponse)
+
+	assert.NotEmpty(t, signInResponse["token"]) // Assuming the response contains a token
+}
