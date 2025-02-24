@@ -81,5 +81,5 @@ func TestSignInRoute(t *testing.T) {
 	var signInResponse map[string]interface{}
 	json.Unmarshal(signInResponseWriter.Body.Bytes(), &signInResponse)
 
-	assert.NotEmpty(t, signInResponse["token"]) // Assuming the response contains a token
+	assert.NotEmpty(t, signInResponse["token"])
 }
