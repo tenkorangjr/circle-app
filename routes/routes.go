@@ -1,6 +1,9 @@
 package routes
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/tenkorangjr/circle-app/middleware"
+)
 
 func RegisterRoutes(server *gin.Engine) {
 	// user routes
@@ -8,5 +11,6 @@ func RegisterRoutes(server *gin.Engine) {
 	server.POST("/signin", signIn)
 
 	authenticated := server.Group("/")
-	authenticated.POST("/posts")
+	authenticated.Use(middleware.Authenticate)
+	authenticated.POST("/posts", createPost)
 }
