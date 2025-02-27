@@ -27,7 +27,6 @@ func signUp(context *gin.Context) {
 	context.JSON(http.StatusCreated, user)
 }
 
-// Sign in the user by checking if the user exists using the email and then validating the password
 func signIn(context *gin.Context) {
 
 	var user models.User
@@ -50,7 +49,7 @@ func signIn(context *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateJWT(int(queryUser.ID), queryUser.Email)
+	token, err := utils.GenerateJWT(queryUser.ID, queryUser.Email)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not generate JWT token"})
 		return
