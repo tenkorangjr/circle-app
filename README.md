@@ -1,5 +1,5 @@
 # Circle Demo App 🚀  
-Just a demo backend project for connecting with friends
+Just a demo backend project for connecting with friends (in progress)
 
 ## About  
 Created for fun!
