@@ -43,7 +43,7 @@ func ValidateToken(token string) (uint, error) {
 		return 0, errors.New("invalid claims type")
 	}
 
-	user_id := claims["user_id"].(uint)
+	user_id := uint(claims["user_id"].(float64))
 
 	return user_id, nil
 }
