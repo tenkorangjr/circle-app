@@ -25,6 +25,31 @@ func SetupTestDB() *gorm.DB {
 	return db
 }
 
+func SignUpMock(server *gin.Engine) *httptest.ResponseRecorder {
+	user := models.NewUser("michael@tenkorang.com", "admin")
+	userBytes, _ := json.Marshal(user)
+	req, _ := http.NewRequest("POST", "/signup", bytes.NewBuffer(userBytes))
+	req.Header.Set("Content-Type", "application/json")
+	responseWriter := httptest.NewRecorder()
+	server.ServeHTTP(responseWriter, req)
+
+	return responseWriter
+}
+
+func SignInMock(server *gin.Engine) *httptest.ResponseRecorder {
+	signInData := map[string]string{
+		"email":    "michael@tenkorang.com",
+		"password": "admin",
+	}
+	signInBytes, _ := json.Marshal(signInData)
+	signInReq, _ := http.NewRequest("POST", "/signin", bytes.NewBuffer(signInBytes))
+	signInReq.Header.Set("Content-Type", "application/json")
+	signInResponseWriter := httptest.NewRecorder()
+	server.ServeHTTP(signInResponseWriter, signInReq)
+
+	return signInResponseWriter
+}
+
 func TestSignUpRoute(t *testing.T) {
 	db.DB = SetupTestDB()
 	server := gin.Default()
@@ -56,25 +81,12 @@ func TestSignInRoute(t *testing.T) {
 	RegisterRoutes(server)
 
 	// Mock signing up a user
-	user := models.NewUser("michael@tenkorang.com", "admin")
-	userBytes, _ := json.Marshal(user)
-	req, _ := http.NewRequest("POST", "/signup", bytes.NewBuffer(userBytes))
-	req.Header.Set("Content-Type", "application/json")
-	responseWriter := httptest.NewRecorder()
-	server.ServeHTTP(responseWriter, req)
+	responseWriter := SignUpMock(server)
 
 	assert.Equal(t, http.StatusCreated, responseWriter.Code)
 
 	// Testing signing in user
-	signInData := map[string]string{
-		"email":    "michael@tenkorang.com",
-		"password": "admin",
-	}
-	signInBytes, _ := json.Marshal(signInData)
-	signInReq, _ := http.NewRequest("POST", "/signin", bytes.NewBuffer(signInBytes))
-	signInReq.Header.Set("Content-Type", "application/json")
-	signInResponseWriter := httptest.NewRecorder()
-	server.ServeHTTP(signInResponseWriter, signInReq)
+	signInResponseWriter := SignInMock(server)
 
 	assert.Equal(t, http.StatusOK, signInResponseWriter.Code)
 
