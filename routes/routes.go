@@ -13,4 +13,5 @@ func RegisterRoutes(server *gin.Engine) {
 	authenticated := server.Group("/")
 	authenticated.Use(middleware.Authenticate)
 	authenticated.POST("/posts", createPost)
+	authenticated.GET("/:id/:postid", getPostbyUserAndPostID)
 }
