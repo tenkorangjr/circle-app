@@ -8,7 +8,7 @@ import (
 type User struct {
 	gorm.Model
 
-	Email    string  `binding:"required"`
+	Email    string  `binding:"required" validate:"required,email"`
 	Password string  `binding:"required"`
 	Friends  []*User `gorm:"many2many:user_friends;"`
 }
