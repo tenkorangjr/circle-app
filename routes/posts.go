@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/tenkorangjr/circle-app/db"
 	"github.com/tenkorangjr/circle-app/models"
+	requestmodel "github.com/tenkorangjr/circle-app/models/requests"
 	"github.com/tenkorangjr/circle-app/utils"
 	"gorm.io/gorm"
 )
@@ -101,4 +103,85 @@ func getPostbyUserAndPostID(gc *gin.Context) {
 	}
 
 	gc.JSON(http.StatusOK, gin.H{"post": post, "signed_url": url})
+}
+
+func postLike(gc *gin.Context) {
+	postId := gc.Param("postid")
+	userId := gc.GetUint("userId")
+	if postId == "" {
+		gc.JSON(http.StatusBadRequest, gin.H{"message": "no post id given"})
+		return
+	}
+
+	parsedPostID, err := strconv.Atoi(postId)
+	if err != nil {
+		gc.JSON(http.StatusBadRequest, gin.H{"message": "invalid post id format", "error": err.Error()})
+		return
+	}
+
+	var like models.PostLike
+	err = db.DB.Transaction(func(tx *gorm.DB) error {
+		like = models.PostLike{
+			PostID:  uint(parsedPostID),
+			LikerID: userId,
+		}
+
+		if err := tx.Create(&like).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		gc.JSON(http.StatusInternalServerError, gin.H{"message": "failed to add like", "error": err.Error()})
+		return
+	}
+
+	gc.JSON(http.StatusCreated, gin.H{"message": "like added to post", "like": like})
+}
+
+func postComment(gc *gin.Context) {
+	postId := gc.Param("postid")
+	userId := gc.GetUint("userId")
+	if postId == "" {
+		gc.JSON(http.StatusBadRequest, gin.H{"message": "no post id given"})
+		return
+	}
+
+	var postComment requestmodel.CommentRequest
+	err := gc.ShouldBindJSON(&postComment)
+	if err != nil {
+		gc.JSON(http.StatusBadRequest, gin.H{"message": "no content attached to comment"})
+		return
+	}
+	if validate.Struct(postComment) != nil {
+		gc.JSON(http.StatusBadRequest, gin.H{"message": "comment exceed required length"})
+	}
+
+	parsedPostID, err := strconv.Atoi(postId)
+	if err != nil {
+		gc.JSON(http.StatusBadRequest, gin.H{"message": "invalid post id format", "error": err.Error()})
+		return
+	}
+
+	var comment models.PostComment
+	err = db.DB.Transaction(func(tx *gorm.DB) error {
+		comment = models.PostComment{
+			Content:     postComment.Content,
+			PostID:      uint(parsedPostID),
+			CommenterID: userId,
+		}
+
+		if err := tx.Create(&comment).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		gc.JSON(http.StatusInternalServerError, gin.H{"message": "failed to add comment", "error": err.Error()})
+		return
+	}
+
+	gc.JSON(http.StatusCreated, gin.H{"message": "comment added to post", "comment": comment})
 }

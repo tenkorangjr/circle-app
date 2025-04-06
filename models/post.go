@@ -24,7 +24,7 @@ type PostComment struct {
 	gorm.Model
 
 	Content     string
-	PostID      uint
+	PostID      uint `validate:"required,number"`
 	Post        Post
 	CommenterID uint
 }
