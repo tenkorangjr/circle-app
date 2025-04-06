@@ -1,23 +1,17 @@
 package routes
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"io"
-	"mime/multipart"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/tenkorangjr/circle-app/db"
 	"github.com/tenkorangjr/circle-app/models"
+	"github.com/tenkorangjr/circle-app/utils"
 	"gorm.io/gorm"
-
-	"cloud.google.com/go/storage"
-	"golang.org/x/oauth2/google"
 )
 
 const uploadTimeout = 50 * time.Second
@@ -68,7 +62,7 @@ func createPost(gc *gin.Context) {
 
 		postName := fmt.Sprintf("%d/%d.jpg", userId, post.ID)
 
-		path, err := uploadToBucket(f, postName, gctx)
+		path, err := utils.UploadToBucket(f, postName, gctx, uploadTimeout)
 		if err != nil {
 			return err
 		}
@@ -100,75 +94,11 @@ func getPostbyUserAndPostID(gc *gin.Context) {
 		return
 	}
 
-	url, err := generateGetSignedURL(post.ImageURL, gc.Request.Context())
+	url, err := utils.GenerateGetSignedURL(post.ImageURL, gc.Request.Context())
 	if err != nil {
 		gc.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to generate signed URL", "error": err.Error()})
 		return
 	}
 
 	gc.JSON(http.StatusOK, gin.H{"post": post, "signed_url": url})
-}
-
-func generateGetSignedURL(object string, context context.Context) (string, error) {
-	bucket := os.Getenv("BUCKET_NAME")
-	sakeyFile := "./sa-cred.json"
-
-	saKey, err := os.ReadFile(sakeyFile)
-	if err != nil {
-		return "", fmt.Errorf("failed to read service account key")
-	}
-
-	cfg, err := google.JWTConfigFromJSON(saKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to read config file with service account key")
-	}
-
-	client, err := storage.NewClient(context)
-	if err != nil {
-		return "", err
-	}
-	defer client.Close()
-
-	opts := &storage.SignedURLOptions{
-		GoogleAccessID: cfg.Email,
-		PrivateKey:     cfg.PrivateKey,
-		Scheme:         storage.SigningSchemeV4,
-		Method:         "GET",
-		Expires:        time.Now().Add(15 * time.Minute),
-	}
-
-	url, err := client.Bucket(bucket).SignedURL(object, opts)
-	if err != nil {
-		return "", fmt.Errorf("Bucket(%q).SignedURL: %w", bucket, err)
-	}
-
-	return url, nil
-}
-
-func uploadToBucket(file multipart.File, postName string, ctx context.Context) (string, error) {
-	bucketName := "circle_app_posts"
-
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		return "", err
-	}
-	defer client.Close()
-
-	ctx, cancel := context.WithTimeout(ctx, uploadTimeout)
-	defer cancel()
-
-	o := client.Bucket(bucketName).Object(postName)
-
-	wc := o.NewWriter(ctx)
-	if _, err = io.Copy(wc, file); err != nil {
-		wc.Close()
-		return "", err
-	}
-
-	if err := wc.Close(); err != nil {
-		return "", err
-	}
-
-	fmt.Printf("Blob uploaded successfully: %s", postName)
-	return postName, nil
 }
