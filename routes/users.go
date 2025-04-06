@@ -4,10 +4,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/tenkorangjr/circle-app/db"
 	"github.com/tenkorangjr/circle-app/models"
 	"github.com/tenkorangjr/circle-app/utils"
 )
+
+var validate = validator.New(validator.WithRequiredStructEnabled())
 
 func signUp(context *gin.Context) {
 
@@ -15,6 +18,12 @@ func signUp(context *gin.Context) {
 	err := context.ShouldBindJSON(&user)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not create user model"})
+		return
+	}
+
+	err = validate.Struct(user)
+	if err != nil {
+		context.JSON(http.StatusBadGateway, gin.H{"message": "bad input", "err": err.Error()})
 		return
 	}
 

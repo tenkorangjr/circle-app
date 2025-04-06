@@ -6,7 +6,7 @@ type Post struct {
 	gorm.Model
 
 	ImageURL string
-	Caption  string
+	Caption  string `validate:"max=100"`
 	UserID   uint
 	User     User
 }
