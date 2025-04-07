@@ -1,10 +1,10 @@
 package routes
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -91,9 +91,40 @@ func getPostbyUserAndPostID(gc *gin.Context) {
 	}
 
 	var post models.Post
-	if result := db.DB.Preload("User").Preload("PostLike").Preload("PostComment").First(&post, requestPostID); errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		gc.JSON(http.StatusBadRequest, gin.H{"message": "post does not exist"})
-		return
+	var wg sync.WaitGroup
+
+	errorChan := make(chan error, 3)
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		if err := db.DB.Preload("User").First(&post, requestPostID).Error; err != nil {
+			errorChan <- err
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		if err := db.DB.Preload("Likes").First(&post, requestPostID).Error; err != nil {
+			errorChan <- err
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		if err := db.DB.Preload("Comments").First(&post, requestPostID).Error; err != nil {
+			errorChan <- err
+		}
+	}()
+
+	wg.Wait()
+	close(errorChan)
+
+	for err := range errorChan {
+		if err != nil {
+			gc.JSON(http.StatusInternalServerError, gin.H{"message": "failed to preload associated field", "error": err})
+			return
+		}
 	}
 
 	url, err := utils.GenerateGetSignedURL(post.ImageURL, gc.Request.Context())
@@ -131,12 +162,41 @@ func postLike(gc *gin.Context) {
 			return err
 		}
 
-		if err := tx.
-			Preload("User").
-			Preload("Likes").
-			Preload("Comments").
-			First(&post, parsedPostID).Error; err != nil {
-			return err
+		var wg sync.WaitGroup
+		wg.Add(3)
+		errChan := make(chan error, 3)
+
+		go func() {
+			defer wg.Done()
+			if err := tx.Preload("User").
+				First(&post, parsedPostID).Error; err != nil {
+				errChan <- err
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			if err := tx.Preload("Likes").
+				First(&post, parsedPostID).Error; err != nil {
+				errChan <- err
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			if err := tx.Preload("Comments").
+				First(&post, parsedPostID).Error; err != nil {
+				errChan <- err
+			}
+		}()
+
+		wg.Wait()
+		close(errChan)
+
+		for err := range errChan {
+			if err != nil {
+				return err
+			}
 		}
 
 		if post.Likes != nil {
@@ -194,12 +254,41 @@ func postComment(gc *gin.Context) {
 			return err
 		}
 
-		if err := tx.
-			Preload("User").
-			Preload("Likes").
-			Preload("Comments").
-			First(&post, parsedPostID).Error; err != nil {
-			return err
+		var wg sync.WaitGroup
+		wg.Add(3)
+		errChan := make(chan error, 3)
+
+		go func() {
+			defer wg.Done()
+			if err := tx.Preload("User").
+				First(&post, parsedPostID).Error; err != nil {
+				errChan <- err
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			if err := tx.Preload("Likes").
+				First(&post, parsedPostID).Error; err != nil {
+				errChan <- err
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			if err := tx.Preload("Comments").
+				First(&post, parsedPostID).Error; err != nil {
+				errChan <- err
+			}
+		}()
+
+		wg.Wait()
+		close(errChan)
+
+		for err := range errChan {
+			if err != nil {
+				return err
+			}
 		}
 
 		if post.Comments != nil {
