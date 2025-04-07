@@ -70,7 +70,7 @@ func createPost(gc *gin.Context) {
 		}
 		post.ImageURL = path
 
-		if err := tx.Save(post).Error; err != nil {
+		if err := tx.Save(&post).Error; err != nil {
 			return err
 		}
 		return nil
@@ -91,7 +91,7 @@ func getPostbyUserAndPostID(gc *gin.Context) {
 	}
 
 	var post models.Post
-	if result := db.DB.Preload("User").First(&post, requestPostID); errors.Is(result.Error, gorm.ErrRecordNotFound) {
+	if result := db.DB.Preload("User").Preload("PostLike").Preload("PostComment").First(&post, requestPostID); errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		gc.JSON(http.StatusBadRequest, gin.H{"message": "post does not exist"})
 		return
 	}
@@ -102,7 +102,7 @@ func getPostbyUserAndPostID(gc *gin.Context) {
 		return
 	}
 
-	gc.JSON(http.StatusOK, gin.H{"post": post, "signed_url": url})
+	gc.JSON(http.StatusOK, gin.H{"post": post, "signed_url": url, "likes": len(post.Likes)})
 }
 
 func postLike(gc *gin.Context) {
@@ -120,6 +120,7 @@ func postLike(gc *gin.Context) {
 	}
 
 	var like models.PostLike
+	var post models.Post
 	err = db.DB.Transaction(func(tx *gorm.DB) error {
 		like = models.PostLike{
 			PostID:  uint(parsedPostID),
@@ -130,6 +131,22 @@ func postLike(gc *gin.Context) {
 			return err
 		}
 
+		if err := tx.
+			Preload("User").
+			Preload("Likes").
+			Preload("Comments").
+			First(&post, parsedPostID).Error; err != nil {
+			return err
+		}
+
+		if post.Likes != nil {
+			post.Likes = append(post.Likes, like)
+		}
+
+		if err := tx.Save(&post).Error; err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -137,7 +154,7 @@ func postLike(gc *gin.Context) {
 		return
 	}
 
-	gc.JSON(http.StatusCreated, gin.H{"message": "like added to post", "like": like})
+	gc.JSON(http.StatusCreated, gin.H{"message": "like added to post", "likes": len(post.Likes), "post": post})
 }
 
 func postComment(gc *gin.Context) {
@@ -165,6 +182,7 @@ func postComment(gc *gin.Context) {
 	}
 
 	var comment models.PostComment
+	var post models.Post
 	err = db.DB.Transaction(func(tx *gorm.DB) error {
 		comment = models.PostComment{
 			Content:     postComment.Content,
@@ -176,6 +194,22 @@ func postComment(gc *gin.Context) {
 			return err
 		}
 
+		if err := tx.
+			Preload("User").
+			Preload("Likes").
+			Preload("Comments").
+			First(&post, parsedPostID).Error; err != nil {
+			return err
+		}
+
+		if post.Comments != nil {
+			post.Comments = append(post.Comments, comment)
+		}
+
+		if err := tx.Save(&post).Error; err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -183,5 +217,5 @@ func postComment(gc *gin.Context) {
 		return
 	}
 
-	gc.JSON(http.StatusCreated, gin.H{"message": "comment added to post", "comment": comment})
+	gc.JSON(http.StatusCreated, gin.H{"message": "comment added to post", "comment": comment, "post": post})
 }
