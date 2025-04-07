@@ -9,6 +9,8 @@ type Post struct {
 	Caption  string `validate:"max=100"`
 	UserID   uint
 	User     User
+	Likes    []PostLike
+	Comments []PostComment
 }
 
 func NewPost(imageURL, caption string, userId uint, user User) *Post {
@@ -24,8 +26,7 @@ type PostComment struct {
 	gorm.Model
 
 	Content     string
-	PostID      uint
-	Post        Post
+	PostID      uint `validate:"required,number"`
 	CommenterID uint
 }
 
@@ -33,6 +34,5 @@ type PostLike struct {
 	gorm.Model
 
 	PostID  uint
-	Post    Post
 	LikerID uint
 }
