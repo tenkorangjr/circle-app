@@ -1,11 +1,14 @@
 package routes
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/tenkorangjr/circle-app/middleware"
 )
 
 func RegisterRoutes(server *gin.Engine) {
+	server.Use(middleware.RateLimiter(5, time.Second))
 	// user routes
 	server.POST("/signup", signUp)
 	server.POST("/signin", signIn)
