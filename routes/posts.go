@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +14,7 @@ import (
 	"github.com/tenkorangjr/circle-app/utils"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const uploadTimeout = 50 * time.Second
@@ -62,7 +62,12 @@ func createPost(gc *gin.Context) {
 
 	post := models.NewPost("", caption, userId, user)
 	err = db.DB.Transaction(func(tx *gorm.DB) error {
-		defer tx.Rollback()
+		defer func() {
+			if r := recover(); r != nil || err != nil {
+				tx.Rollback()
+			}
+		}()
+
 		if err := tx.Create(post).Error; err != nil {
 			zap.S().Error("Failed to create post", zap.Error(err))
 			return err
@@ -103,41 +108,10 @@ func getPostbyUserAndPostID(gc *gin.Context) {
 	}
 
 	var post models.Post
-	var wg sync.WaitGroup
-
-	errorChan := make(chan error, 3)
-	wg.Add(3)
-
-	go func() {
-		defer wg.Done()
-		if err := db.DB.Preload("User").First(&post, requestPostID).Error; err != nil {
-			errorChan <- err
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		if err := db.DB.Preload("Likes").First(&post, requestPostID).Error; err != nil {
-			errorChan <- err
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		if err := db.DB.Preload("Comments").First(&post, requestPostID).Error; err != nil {
-			errorChan <- err
-		}
-	}()
-
-	wg.Wait()
-	close(errorChan)
-
-	for err := range errorChan {
-		if err != nil {
-			zap.S().Error("Failed to preload associated field", zap.Error(err))
-			gc.JSON(http.StatusInternalServerError, gin.H{"message": "failed to preload associated field"})
-			return
-		}
+	if err := db.DB.Preload(clause.Associations).
+		First(&post, requestPostID).Error; err != nil {
+		gc.JSON(http.StatusBadRequest, gin.H{"mesage": "could not find the post"})
+		return
 	}
 
 	url, err := utils.GenerateGetSignedURL(post.ImageURL, gc.Request.Context())
@@ -170,7 +144,12 @@ func postLike(gc *gin.Context) {
 	var like models.PostLike
 	var post models.Post
 	err = db.DB.Transaction(func(tx *gorm.DB) error {
-		defer tx.Rollback()
+		defer func() {
+			if r := recover(); r != nil || err != nil {
+				tx.Rollback()
+			}
+		}()
+
 		like = models.PostLike{
 			PostID:  uint(parsedPostID),
 			LikerID: userId,
@@ -181,42 +160,9 @@ func postLike(gc *gin.Context) {
 			return err
 		}
 
-		var wg sync.WaitGroup
-		wg.Add(3)
-		errChan := make(chan error, 3)
-
-		go func() {
-			defer wg.Done()
-			if err := tx.Preload("User").
-				First(&post, parsedPostID).Error; err != nil {
-				errChan <- err
-			}
-		}()
-
-		go func() {
-			defer wg.Done()
-			if err := tx.Preload("Likes").
-				First(&post, parsedPostID).Error; err != nil {
-				errChan <- err
-			}
-		}()
-
-		go func() {
-			defer wg.Done()
-			if err := tx.Preload("Comments").
-				First(&post, parsedPostID).Error; err != nil {
-				errChan <- err
-			}
-		}()
-
-		wg.Wait()
-		close(errChan)
-
-		for err := range errChan {
-			if err != nil {
-				zap.S().Error("Failed to preload associated field", zap.Error(err))
-				return err
-			}
+		if err = db.DB.Preload(clause.Associations).
+			First(&post, parsedPostID).Error; err != nil {
+			return err
 		}
 
 		if post.Likes != nil {
@@ -271,7 +217,12 @@ func postComment(gc *gin.Context) {
 	var comment models.PostComment
 	var post models.Post
 	err = db.DB.Transaction(func(tx *gorm.DB) error {
-		defer tx.Rollback()
+		defer func() {
+			if r := recover(); r != nil || err != nil {
+				tx.Rollback()
+			}
+		}()
+
 		comment = models.PostComment{
 			Content:     postComment.Content,
 			PostID:      uint(parsedPostID),
@@ -283,42 +234,9 @@ func postComment(gc *gin.Context) {
 			return err
 		}
 
-		var wg sync.WaitGroup
-		wg.Add(3)
-		errChan := make(chan error, 3)
-
-		go func() {
-			defer wg.Done()
-			if err := tx.Preload("User").
-				First(&post, parsedPostID).Error; err != nil {
-				errChan <- err
-			}
-		}()
-
-		go func() {
-			defer wg.Done()
-			if err := tx.Preload("Likes").
-				First(&post, parsedPostID).Error; err != nil {
-				errChan <- err
-			}
-		}()
-
-		go func() {
-			defer wg.Done()
-			if err := tx.Preload("Comments").
-				First(&post, parsedPostID).Error; err != nil {
-				errChan <- err
-			}
-		}()
-
-		wg.Wait()
-		close(errChan)
-
-		for err := range errChan {
-			if err != nil {
-				zap.S().Error("Failed to preload associated field", zap.Error(err))
-				return err
-			}
+		if err = db.DB.Preload(clause.Associations).
+			First(&post, parsedPostID).Error; err != nil {
+			return err
 		}
 
 		if post.Comments != nil {
