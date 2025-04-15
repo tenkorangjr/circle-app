@@ -8,6 +8,7 @@ import (
 )
 
 func main() {
+	gin.ForceConsoleColor()
 
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
@@ -19,5 +20,5 @@ func main() {
 
 	routes.RegisterRoutes(server)
 
-	server.Run(":3000")
+	server.Run(":8080")
 }
