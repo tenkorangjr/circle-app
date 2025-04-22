@@ -17,8 +17,8 @@ func RegisterRoutes(server *gin.Engine) {
 	authenticated := server.Group("/")
 	authenticated.Use(middleware.Authenticate)
 	authenticated.POST("/posts", createPost)
-	authenticated.GET("/:id/:postid", getPostbyUserAndPostID)
-	authenticated.POST("/:postid/comment", postComment)
-	authenticated.POST("/:postid/like", postLike)
+	authenticated.GET("/posts/:id/:postid", getPostbyUserAndPostID)
+	authenticated.POST("/posts/:postid/comment", postComment)
+	authenticated.POST("/posts/:postid/like", postLike)
 	authenticated.GET("/chat", websockets.HandleWs)
 }
